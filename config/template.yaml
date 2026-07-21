@@ -44,11 +44,10 @@ Resources:
                 - logs:CreateLogStream
                 - logs:PutLogEvents
               Resource: arn:aws:logs:*:*:*
-      Events:
-        AlexaSkillEvent:
-          Type: AlexaSkill
-          Properties:
-            SkillId: "*"
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: "*"
 
 Outputs:
   FvFunctionArn:
