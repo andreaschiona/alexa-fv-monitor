@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Alexa FV Monitor - Lambda per skill Alexa WiseSolar
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.12
+    MemorySize: 128
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        FV_USER: !Ref FvUser
+        FV_PASS: !Ref FvPass
+        FV_STATION_ID: !Ref FvStationId
+
+Parameters:
+  FvUser:
+    Type: String
+    Description: WiseSolar account email
+    NoEcho: true
+  FvPass:
+    Type: String
+    Description: WiseSolar account password
+    NoEcho: true
+  FvStationId:
+    Type: String
+    Default: "3680"
+    Description: WiseSolar station ID
+
+Resources:
+  FvFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: fv_handler.lambda_handler
+      CodeUri: ../src/
+      Description: Alexa skill handler for FV monitoring
+      Policies:
+        - AlexaSkillsKitInvokePermission:
+            SkillId: "*"
+      Events:
+        AlexaSkillEvent:
+          Type: AlexaSkill
+          Properties:
+            SkillId: "*"
+
+Outputs:
+  FvFunctionArn:
+    Description: Lambda ARN for Alexa Skill endpoint
+    Value: !GetAtt FvFunction.Arn
+  FvFunctionName:
+    Description: Lambda function name
+    Value: !Ref FvFunction
