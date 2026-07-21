@@ -34,7 +34,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: fv_handler.lambda_handler
-      CodeUri: ../src/
+      CodeUri: src/
       Description: Alexa skill handler for FV monitoring
       Policies:
         - AlexaSkillsKitInvokePermission:
