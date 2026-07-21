@@ -57,3 +57,5 @@ WiseSolar Cloud API
 
 ## Licenza
 MIT
+# Deploy test Tue Jul 21 23:24:43 CEST 2026
+# Deploy test Tue Jul 21 23:25:11 CEST 2026
