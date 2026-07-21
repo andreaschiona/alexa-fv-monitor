@@ -37,8 +37,13 @@ Resources:
       CodeUri: src/
       Description: Alexa skill handler for FV monitoring
       Policies:
-        - AlexaSkillsKitInvokePermission:
-            SkillId: "*"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: arn:aws:logs:*:*:*
       Events:
         AlexaSkillEvent:
           Type: AlexaSkill
