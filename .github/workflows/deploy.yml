@@ -59,18 +59,23 @@ jobs:
 
       - name: SAM Deploy
         run: |
-          sam deploy             --no-confirm-changeset             --no-fail-on-empty-changeset             --parameter-overrides               FvUser="${{ secrets.FV_USER }}"               FvPass="${{ secrets.FV_PASS }}"               FvStationId="${{ secrets.FV_STATION_ID }}"             --capabilities CAPABILITY_IAM
+          sam deploy             --stack-name fv-monitor             --no-confirm-changeset             --no-fail-on-empty-changeset             --parameter-overrides               FvUser="${{ secrets.FV_USER }}"               FvPass="${{ secrets.FV_PASS }}"               FvStationId="${{ secrets.FV_STATION_ID }}"             --capabilities CAPABILITY_IAM
 
       - name: Get Lambda ARN
         id: arn
         run: |
-          ARN=
+          ARN=$(aws cloudformation describe-stacks --stack-name fv-monitor --query "Stacks[0].Outputs[?OutputKey=='FvFunctionArn'].OutputValue" --output text)
           echo "Lambda ARN: $ARN"
           echo "arn=$ARN" >> $GITHUB_OUTPUT
-
-      - name: Summary
-        run: |
-          echo "## Deploy Summary" >> $GITHUB_STEP_SUMMARY
-          echo "Lambda ARN: ${{ steps.arn.outputs.arn }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Collega la Alexa Skill a questo ARN in developer.amazon.com" >> $GITHUB_STEP_SUMMARY
+          echo "### Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Stack**: fv-monitor" >> $GITHUB_STEP_SUMMARY
+          echo "**Lambda ARN**: \`$ARN\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to https://developer.amazon.com/alexa/console/ask" >> $GITHUB_STEP_SUMMARY
+          echo "2. Create Alexa Skill (Custom, Italian)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Set Lambda endpoint to this ARN" >> $GITHUB_STEP_SUMMARY
+          echo "4. Create intent 'FVStatusIntent' with utterances" >> $GITHUB_STEP_SUMMARY
+          echo "5. Build model and test" >> $GITHUB_STEP_SUMMARY
