@@ -4,18 +4,15 @@ Tests for Alexa FV Monitor Lambda handler.
 import json
 import os
 import pytest
+from unittest.mock import patch, MagicMock
 
 # Mock environment variables before import
 os.environ['FV_USER'] = 'test@example.com'
 os.environ['FV_PASS'] = 'testpass'
 os.environ['FV_STATION_ID'] = '1234'
-os.environ['FV_CUSTOMER_ID'] = '9999'
 
 # Mock the API module before importing handler
 import sys
-from unittest.mock import patch, MagicMock
-
-# Create mock module
 mock_api = MagicMock()
 mock_api.get_all_data.return_value = {
     'pv_power': 1500,
