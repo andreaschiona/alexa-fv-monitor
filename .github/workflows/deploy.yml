@@ -59,7 +59,7 @@ jobs:
 
       - name: SAM Deploy
         run: |
-          sam deploy             --stack-name fv-monitor             --no-confirm-changeset             --no-fail-on-empty-changeset             --parameter-overrides               FvUser="${{ secrets.FV_USER }}"               FvPass="${{ secrets.FV_PASS }}"               FvStationId="${{ secrets.FV_STATION_ID }}"             --capabilities CAPABILITY_IAM
+          sam deploy             --stack-name fv-monitor             --resolve-s3 --no-confirm-changeset             --no-fail-on-empty-changeset             --parameter-overrides               FvUser="${{ secrets.FV_USER }}"               FvPass="${{ secrets.FV_PASS }}"               FvStationId="${{ secrets.FV_STATION_ID }}"             --capabilities CAPABILITY_IAM
 
       - name: Get Lambda ARN
         id: arn
