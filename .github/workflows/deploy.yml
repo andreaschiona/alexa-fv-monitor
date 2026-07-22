@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'config/template.yaml'
+      - 'skill-package/**'
       - 'VERSION'
   workflow_dispatch:
 
@@ -72,10 +73,89 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Stack**: fv-monitor" >> $GITHUB_STEP_SUMMARY
           echo "**Lambda ARN**: \`$ARN\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Go to https://developer.amazon.com/alexa/console/ask" >> $GITHUB_STEP_SUMMARY
-          echo "2. Create Alexa Skill (Custom, Italian)" >> $GITHUB_STEP_SUMMARY
-          echo "3. Set Lambda endpoint to this ARN" >> $GITHUB_STEP_SUMMARY
-          echo "4. Create intent 'FVStatusIntent' with utterances" >> $GITHUB_STEP_SUMMARY
-          echo "5. Build model and test" >> $GITHUB_STEP_SUMMARY
+
+      - name: Setup ASK CLI
+        run: npm install -g ask-cli
+
+      - name: Configure ASK CLI
+        run: |
+          mkdir -p ~/.ask
+          cat > ~/.ask/cli_config << 'CONFIG'
+          {
+            "profiles": {
+              "default": {
+                "vendor_id": "${ASK_VENDOR_ID}",
+                "oauth_client": {
+                  "client_id": "${ASK_CLIENT_ID}",
+                  "client_secret": "${ASK_CLIENT_SECRET}"
+                }
+              }
+            }
+          }
+          CONFIG
+          # Expand env vars in the config (GitHub Actions heredoc doesn't expand $ vars with 'CONFIG' quotes)
+          python3 -c "
+          import json, os
+          with open(os.path.expanduser('~/.ask/cli_config')) as f:
+              cfg = f.read()
+          for k, v in os.environ.items():
+              if k.startswith('ASK_'):
+                  cfg = cfg.replace('\${' + k + '}', v)
+          with open(os.path.expanduser('~/.ask/cli_config'), 'w') as f:
+              f.write(cfg)
+          "
+          echo "ASK CLI configured for vendor: $ASK_VENDOR_ID"
+        env:
+          ASK_VENDOR_ID: ${{ secrets.ASK_VENDOR_ID }}
+          ASK_CLIENT_ID: ${{ secrets.ASK_CLIENT_ID }}
+          ASK_CLIENT_SECRET: ${{ secrets.ASK_CLIENT_SECRET }}
+
+      - name: Deploy Alexa Skill Model
+        id: ask_deploy
+        run: |
+          # Generate .ask/config (handles both first-deploy and updates)
+          mkdir -p .ask
+          if [ -n "${SKILL_ID}" ]; then
+            echo "Using existing skill ID: ${SKILL_ID}"
+            cat > .ask/config << EOF
+          {
+            "profiles": {
+              "default": {
+                "skillId": "${SKILL_ID}",
+                "skillMetadata": {
+                  "type": "SKILL_PACKAGE"
+                }
+              }
+            }
+          }
+          EOF
+          else
+            echo "No SKILL_ID set — will create new skill on first deploy"
+          fi
+
+          # Replace Lambda ARN placeholder
+          LAMBDA_ARN="${{ steps.arn.outputs.arn }}"
+          sed -i "s|LAMBDA_ARN_PLACEHOLDER|${LAMBDA_ARN}|g" skill-package/skill.json
+          echo "ARN injected into skill.json"
+
+          # Deploy
+          ask deploy --profile default --force
+          echo "Skill deploy exit code: $?"
+
+          # Capture new skill ID (first deploy)
+          if [ -f .ask/config ]; then
+            NEW_SKILL_ID=$(python3 -c "import json; c=json.load(open('.ask/config')); print(c.get('profiles',{}).get('default',{}).get('skillId',''))" 2>/dev/null)
+            if [ -n "${NEW_SKILL_ID}" ]; then
+              echo "skill_id=${NEW_SKILL_ID}" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Alexa Skill Deployed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Skill ID**: \`${NEW_SKILL_ID}\`" >> $GITHUB_STEP_SUMMARY
+              if [ -z "${SKILL_ID}" ]; then
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "⚠️ **First deploy!** Save this Skill ID as a GitHub Secret named \`SKILL_ID\`" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          fi
+        env:
+          SKILL_ID: ${{ secrets.SKILL_ID }}

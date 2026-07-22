@@ -1,0 +1,46 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "it-IT": {
+          "name": "FV Monitor",
+          "summary": "Monitoraggio impianto fotovoltaico WiseSolar",
+          "description": "Chiedi ad Alexa lo stato del tuo impianto fotovoltaico WiseSolar. Produzione, consumo, stato rete, guadagno e batteria in tempo reale.",
+          "examplePhrases": [
+            "Alexa, chiedi a FV Monitor la produzione",
+            "Alexa, chiedi a FV Monitor lo stato",
+            "Alexa, apri FV Monitor"
+          ],
+          "keywords": ["fotovoltaico", "wise solar", "energia", "solare"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionMode": "PUBLIC",
+      "distributionCountries": ["IT"],
+      "testingInstructions": "Abilita la skill e chiedi produzione, consumo, stato, guadagno o batteria."
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "LAMBDA_ARN_PLACEHOLDER",
+          "sslCertificateType": "Trusted"
+        },
+        "interfaces": []
+      }
+    },
+    "manifestVersion": "1.0",
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false,
+      "locales": {
+        "it-IT": {
+          "privacyPolicyUrl": null,
+          "termsOfServiceUrl": null
+        }
+      }
+    }
+  }
+}
