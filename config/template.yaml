@@ -49,6 +49,13 @@ Resources:
                 - lambda:InvokeFunction
               Resource: "*"
 
+  AlexaTriggerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref FvFunction
+      Action: lambda:InvokeFunction
+      Principal: alexa-appkit.amazon.com
+
 Outputs:
   FvFunctionArn:
     Description: Lambda ARN for Alexa Skill endpoint
