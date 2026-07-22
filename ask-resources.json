@@ -4,9 +4,7 @@
     "default": {
       "skillMetadata": {
         "type": "SKILL_PACKAGE",
-        "skillPackage": {
-          "src": "skill-package"
-        }
+        "src": "skill-package"
       }
     }
   }
