@@ -7,6 +7,7 @@ on:
       - 'src/**'
       - 'config/template.yaml'
       - 'skill-package/**'
+      - 'scripts/**'
       - 'VERSION'
       - '.github/workflows/**'
   workflow_dispatch:
@@ -20,15 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install dependencies
         run: pip install -r src/requirements.txt pytest
-
       - name: Run tests
         run: pytest tests/ -v
 
@@ -37,126 +35,54 @@ jobs:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
-
     steps:
       - uses: actions/checkout@v6
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Setup AWS SAM
         uses: aws-actions/setup-sam@v2
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-
       - name: SAM Build
         run: sam build --template-file config/template.yaml --base-dir .
-
       - name: SAM Deploy
         run: |
-          sam deploy             --stack-name fv-monitor             --resolve-s3 --no-confirm-changeset             --no-fail-on-empty-changeset             --parameter-overrides               FvUser="${{ secrets.FV_USER }}"               FvPass="${{ secrets.FV_PASS }}"               FvStationId="${{ secrets.FV_STATION_ID }}"             --capabilities CAPABILITY_IAM
-
+          sam deploy \
+            --stack-name fv-monitor \
+            --resolve-s3 --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              FvUser="${{ secrets.FV_USER }}" \
+              FvPass="${{ secrets.FV_PASS }}" \
+              FvStationId="${{ secrets.FV_STATION_ID }}" \
+            --capabilities CAPABILITY_IAM
       - name: Get Lambda ARN
         id: arn
         run: |
-          ARN=$(aws cloudformation describe-stacks --stack-name fv-monitor --query "Stacks[0].Outputs[?OutputKey=='FvFunctionArn'].OutputValue" --output text)
-          echo "Lambda ARN: $ARN"
+          ARN=$(aws cloudformation describe-stacks --stack-name fv-monitor \
+            --query "Stacks[0].Outputs[?OutputKey=='FvFunctionArn'].OutputValue" \
+            --output text)
           echo "arn=$ARN" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Deploy Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Stack**: fv-monitor" >> $GITHUB_STEP_SUMMARY
           echo "**Lambda ARN**: \`$ARN\`" >> $GITHUB_STEP_SUMMARY
-
       - name: Setup ASK CLI
         run: npm install -g ask-cli
-
       - name: Configure ASK CLI
-        run: |
-          mkdir -p ~/.ask
-          python3 -c "
-import json, os
-cfg = {
-    'profiles': {
-        'default': {
-            'vendor_id': os.environ['ASK_VENDOR_ID'],
-            'token': {
-                'access_token': os.environ['ASK_ACCESS_TOKEN'],
-                'refresh_token': os.environ['ASK_REFRESH_TOKEN'],
-                'token_type': 'bearer',
-                'expires_in': 3600
-            }
-        }
-    },
-    'machine_id': 'github-actions'
-}
-with open(os.path.expanduser('~/.ask/cli_config'), 'w') as f:
-    json.dump(cfg, f, indent=2)
-"
-          echo "ASK CLI configured for vendor: $ASK_VENDOR_ID"
+        run: python3 scripts/configure_ask.py
         env:
           ASK_VENDOR_ID: ${{ secrets.ASK_VENDOR_ID }}
           ASK_ACCESS_TOKEN: ${{ secrets.ASK_ACCESS_TOKEN }}
           ASK_REFRESH_TOKEN: ${{ secrets.ASK_REFRESH_TOKEN }}
-
       - name: Deploy Alexa Skill Model
         id: ask_deploy
-        run: |
-          # Generate .ask/config (always needed for skill-package mode)
-          mkdir -p .ask
-          python3 -c "
-import json, os
-cfg = {
-    'profiles': {
-        'default': {
-            'skillMetadata': {
-                'type': 'SKILL_PACKAGE'
-            }
-        }
-    }
-}
-skill_id = os.environ.get('SKILL_ID', '')
-if skill_id:
-    cfg['profiles']['default']['skillId'] = skill_id
-    print(f'Using existing skill ID: {skill_id}')
-else:
-    print('No SKILL_ID set - will create new skill on first deploy')
-with open('.ask/config', 'w') as f:
-    json.dump(cfg, f, indent=2)
-"
-
-          # Replace Lambda ARN placeholder
-          LAMBDA_ARN="${{ steps.arn.outputs.arn }}"
-          sed -i "s|LAMBDA_ARN_PLACEHOLDER|${LAMBDA_ARN}|g" skill-package/skill.json
-          echo "ARN injected into skill.json"
-
-          # Deploy
-          ask deploy --profile default
-          echo "Skill deploy exit code: $?"
-
-          # Capture new skill ID (first deploy)
-          python3 -c "
-import json, os
-try:
-    with open('.ask/config') as f:
-        cfg = json.load(f)
-    sid = cfg.get('profiles', {}).get('default', {}).get('skillId', '')
-    if sid:
-        # Write to GITHUB_OUTPUT
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-            out.write(f'skill_id={sid}\n')
-        print(f'Skill ID: {sid}')
-        if not os.environ.get('SKILL_ID'):
-            print('NOTE: Save this Skill ID as GitHub Secret SKILL_ID for subsequent deploys')
-except Exception as e:
-    print(f'Could not capture skill ID: {e}')
-"
+        run: python3 scripts/deploy_ask.py
         env:
           SKILL_ID: ${{ secrets.SKILL_ID }}
+          LAMBDA_ARN: ${{ steps.arn.outputs.arn }}
