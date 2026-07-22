@@ -1,6 +1,5 @@
 # Python
-*__pycache__/
-.ask/
+__pycache__/
 *.pyc
 *.pyo
 .env

@@ -46,7 +46,7 @@ print(f"ARN injected into skill.json: {lambda_arn}")
 
 # 3. Run ask deploy - capture ALL output first
 result = subprocess.run(
-    ["ask", "deploy", "--profile", "default"],
+    ["ask", "deploy", "--profile", "default", "--debug"],
     capture_output=True, text=True
 )
 
