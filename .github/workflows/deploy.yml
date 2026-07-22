@@ -81,32 +81,25 @@ jobs:
       - name: Configure ASK CLI
         run: |
           mkdir -p ~/.ask
-          cat > ~/.ask/cli_config << 'CONFIG'
-          {
-            "profiles": {
-              "default": {
-                "vendor_id": "${ASK_VENDOR_ID}",
-                "token": {
-                  "access_token": "${ASK_ACCESS_TOKEN}",
-                  "refresh_token": "${ASK_REFRESH_TOKEN}",
-                  "token_type": "bearer",
-                  "expires_in": 3600
-                }
-              }
-            }
-          }
-          CONFIG
-          # Expand env vars in the config
           python3 -c "
-          import json, os
-          with open(os.path.expanduser('~/.ask/cli_config')) as f:
-              cfg = f.read()
-          for k, v in os.environ.items():
-              if k.startswith('ASK_'):
-                  cfg = cfg.replace('\${' + k + '}', v)
-          with open(os.path.expanduser('~/.ask/cli_config'), 'w') as f:
-              f.write(cfg)
-          "
+import json, os
+cfg = {
+    'profiles': {
+        'default': {
+            'vendor_id': os.environ['ASK_VENDOR_ID'],
+            'token': {
+                'access_token': os.environ['ASK_ACCESS_TOKEN'],
+                'refresh_token': os.environ['ASK_REFRESH_TOKEN'],
+                'token_type': 'bearer',
+                'expires_in': 3600
+            }
+        }
+    },
+    'machine_id': 'github-actions'
+}
+with open(os.path.expanduser('~/.ask/cli_config'), 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
           echo "ASK CLI configured for vendor: $ASK_VENDOR_ID"
         env:
           ASK_VENDOR_ID: ${{ secrets.ASK_VENDOR_ID }}
@@ -116,25 +109,28 @@ jobs:
       - name: Deploy Alexa Skill Model
         id: ask_deploy
         run: |
-          # Generate .ask/config (handles both first-deploy and updates)
+          # Generate .ask/config (always needed for skill-package mode)
           mkdir -p .ask
-          if [ -n "${SKILL_ID}" ]; then
-            echo "Using existing skill ID: ${SKILL_ID}"
-            cat > .ask/config << EOF
-          {
-            "profiles": {
-              "default": {
-                "skillId": "${SKILL_ID}",
-                "skillMetadata": {
-                  "type": "SKILL_PACKAGE"
-                }
-              }
+          python3 -c "
+import json, os
+cfg = {
+    'profiles': {
+        'default': {
+            'skillMetadata': {
+                'type': 'SKILL_PACKAGE'
             }
-          }
-          EOF
-          else
-            echo "No SKILL_ID set — will create new skill on first deploy"
-          fi
+        }
+    }
+}
+skill_id = os.environ.get('SKILL_ID', '')
+if skill_id:
+    cfg['profiles']['default']['skillId'] = skill_id
+    print(f'Using existing skill ID: {skill_id}')
+else:
+    print('No SKILL_ID set - will create new skill on first deploy')
+with open('.ask/config', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
 
           # Replace Lambda ARN placeholder
           LAMBDA_ARN="${{ steps.arn.outputs.arn }}"
@@ -146,19 +142,21 @@ jobs:
           echo "Skill deploy exit code: $?"
 
           # Capture new skill ID (first deploy)
-          if [ -f .ask/config ]; then
-            NEW_SKILL_ID=$(python3 -c "import json; c=json.load(open('.ask/config')); print(c.get('profiles',{}).get('default',{}).get('skillId',''))" 2>/dev/null)
-            if [ -n "${NEW_SKILL_ID}" ]; then
-              echo "skill_id=${NEW_SKILL_ID}" >> $GITHUB_OUTPUT
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### Alexa Skill Deployed" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Skill ID**: \`${NEW_SKILL_ID}\`" >> $GITHUB_STEP_SUMMARY
-              if [ -z "${SKILL_ID}" ]; then
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "⚠️ **First deploy!** Save this Skill ID as a GitHub Secret named \`SKILL_ID\`" >> $GITHUB_STEP_SUMMARY
-              fi
-            fi
-          fi
+          python3 -c "
+import json, os
+try:
+    with open('.ask/config') as f:
+        cfg = json.load(f)
+    sid = cfg.get('profiles', {}).get('default', {}).get('skillId', '')
+    if sid:
+        # Write to GITHUB_OUTPUT
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+            out.write(f'skill_id={sid}\n')
+        print(f'Skill ID: {sid}')
+        if not os.environ.get('SKILL_ID'):
+            print('NOTE: Save this Skill ID as GitHub Secret SKILL_ID for subsequent deploys')
+except Exception as e:
+    print(f'Could not capture skill ID: {e}')
+"
         env:
           SKILL_ID: ${{ secrets.SKILL_ID }}
