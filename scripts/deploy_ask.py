@@ -52,7 +52,7 @@ else:
 # 3. Run ask deploy
 print(f"\n=== ask deploy --target skill-package ===")
 result = subprocess.run(
-    ["ask", "deploy", "--target", "skill-package", "--debug"],
+    ["ask", "deploy", "--target", "skill-metadata", "interaction-model", "--debug"],
     capture_output=True, text=True
 )
 
