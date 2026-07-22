@@ -8,6 +8,7 @@ on:
       - 'config/template.yaml'
       - 'skill-package/**'
       - 'scripts/**'
+      - 'ask-resources.json'
       - 'VERSION'
       - '.github/workflows/**'
   workflow_dispatch:
