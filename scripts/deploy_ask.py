@@ -16,6 +16,7 @@ ask_resources = {
             "skillMetadata": {
                 "type": "SKILL_PACKAGE",
                 "skillPackage": {
+                    "path": "skill-package",
                     "src": "skill-package"
                 }
             }
