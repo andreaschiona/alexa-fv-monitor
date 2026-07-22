@@ -4,6 +4,10 @@ import json, os, subprocess, sys
 
 SKILL_ID = os.environ.get("SKILL_ID", "")
 
+# 0. Check ask CLI version
+result = subprocess.run(["ask", "--version"], capture_output=True, text=True)
+print(f"ASK CLI version: {result.stdout.strip() or result.stderr.strip()}")
+
 # 1. Generate .ask/config
 os.makedirs(".ask", exist_ok=True)
 cfg = {
@@ -23,8 +27,9 @@ with open(".ask/config", "w") as f:
     json.dump(cfg, f, indent=2)
 
 # 2. Inject Lambda ARN into skill.json
-lambda_arn = os.environ.get("LAMBDA_ARN", "")
-if not lambda_arn:
+try:
+    lambda_arn = os.environ["LAMBDA_ARN"]
+except KeyError:
     print("ERROR: LAMBDA_ARN not set", file=sys.stderr)
     sys.exit(1)
 
@@ -39,17 +44,21 @@ with open(skill_json_path, "w") as f:
 
 print(f"ARN injected into skill.json: {lambda_arn}")
 
-# 3. Run ask deploy
+# 3. Run ask deploy - capture ALL output first
 result = subprocess.run(
     ["ask", "deploy", "--profile", "default"],
     capture_output=True, text=True
 )
-print(result.stdout)
-if result.returncode != 0:
-    print(result.stderr, file=sys.stderr)
-    sys.exit(result.returncode)
 
-print(f"ask deploy exit code: {result.returncode}")
+# Print ALL output BEFORE checking exit code
+if result.stdout:
+    print(f"[ASK stdout]\n{result.stdout}")
+if result.stderr:
+    print(f"[ASK stderr]\n{result.stderr}", file=sys.stderr)
+print(f"[ASK exit code] {result.returncode}")
+
+if result.returncode != 0:
+    sys.exit(result.returncode)
 
 # 4. Capture new skill ID
 try:
@@ -63,8 +72,8 @@ try:
                 out.write(f"skill_id={sid}\n")
         print(f"Skill ID: {sid}")
         if not SKILL_ID:
-            print("=" * 50)
-            print("IMPORTANT: Save this Skill ID as GitHub Secret SKILL_ID")
-            print("=" * 50)
+            print("=" * 60)
+            print(">>> IMPORTANT: Save this Skill ID as GitHub Secret SKILL_ID <<<")
+            print("=" * 60)
 except Exception as e:
     print(f"Could not capture skill ID: {e}")
