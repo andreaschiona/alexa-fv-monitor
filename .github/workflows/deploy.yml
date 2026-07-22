@@ -142,7 +142,7 @@ jobs:
           echo "ARN injected into skill.json"
 
           # Deploy
-          ask deploy --profile default --force
+          ask deploy --profile default
           echo "Skill deploy exit code: $?"
 
           # Capture new skill ID (first deploy)
