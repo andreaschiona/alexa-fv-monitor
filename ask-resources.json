@@ -1,0 +1,13 @@
+{
+  "askcliResourcesVersion": "2020-01-28",
+  "profiles": {
+    "default": {
+      "skillMetadata": {
+        "type": "SKILL_PACKAGE",
+        "skillPackage": {
+          "path": "skill-package"
+        }
+      }
+    }
+  }
+}
