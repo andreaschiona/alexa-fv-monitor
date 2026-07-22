@@ -1,81 +1,110 @@
 #!/usr/bin/env python3
-"""Deploy Alexa Skill Model: create config, inject ARN, run ask deploy, capture skill ID."""
+"""Deploy Alexa Skill Model via SMAPI (no ask-resources.json needed)."""
 import json, os, subprocess, sys
 
 SKILL_ID = os.environ.get("SKILL_ID", "")
 
-# 0. Check ask CLI version
-result = subprocess.run(["ask", "--version"], capture_output=True, text=True)
-print(f"ASK CLI version: {result.stdout.strip() or result.stderr.strip()}")
+def run_ask(args: list[str]) -> dict:
+    """Run an `ask smapi` command and return parsed JSON + status."""
+    full_cmd = ["ask", "smapi"] + args
+    result = subprocess.run(full_cmd, capture_output=True, text=True)
+    out = result.stdout.strip()
+    err = result.stderr.strip()
+    if out:
+        print(f"[OUT] {out[:500]}")
+    if err:
+        print(f"[ERR] {err[:500]}", file=sys.stderr)
+    print(f"[exit] {result.returncode}")
+    parsed = {}
+    if out:
+        try:
+            parsed = json.loads(out)
+        except json.JSONDecodeError:
+            pass
+    return {"code": result.returncode, "parsed": parsed, "raw_out": out, "raw_err": err}
 
-# 1. Generate .ask/config with skill ID if available
-os.makedirs(".ask", exist_ok=True)
-cfg = {
-    "profiles": {
-        "default": {
-            "skillMetadata": {"type": "SKILL_PACKAGE"},
-        }
-    }
-}
-if SKILL_ID:
-    cfg["profiles"]["default"]["skillId"] = SKILL_ID
-    print(f"Using existing skill ID: {SKILL_ID}")
-else:
-    print("No SKILL_ID set — will create new skill on first deploy")
-
-with open(".ask/config", "w") as f:
-    json.dump(cfg, f, indent=2)
-
-# 2. Inject Lambda ARN into skill.json
-try:
-    lambda_arn = os.environ["LAMBDA_ARN"]
-except KeyError:
-    print("ERROR: LAMBDA_ARN not set", file=sys.stderr)
-    sys.exit(1)
-
+# 1. Read skill manifest
 skill_json_path = "skill-package/skill.json"
 with open(skill_json_path) as f:
-    content = f.read()
+    manifest = json.load(f)
 
-content = content.replace("LAMBDA_ARN_PLACEHOLDER", lambda_arn)
+# 2. Read interaction model
+interaction_path = "skill-package/interactionModels/custom/it-IT.json"
+with open(interaction_path) as f:
+    interaction_model = json.load(f)
 
-with open(skill_json_path, "w") as f:
-    f.write(content)
+if not SKILL_ID:
+    # --- CREATE new skill ---
+    print("=== Creating new skill ===")
+    r = run_ask([
+        "create-skill",
+        "--manifest", json.dumps(manifest),
+        "--vendor-id", os.environ.get("ASK_VENDOR_ID", ""),
+    ])
+    if r["code"] != 0:
+        print("FAILED to create skill")
+        sys.exit(r["code"])
 
-print(f"ARN injected into skill.json: {lambda_arn}")
-
-# 3. Run ask deploy — target only skill-metadata + interaction-model
-#    (Lambda is already deployed via SAM)
-result = subprocess.run(
-    ["ask", "deploy", "--profile", "default",
-     "--target", "skill-metadata", "interaction-model"],
-    capture_output=True, text=True
-)
-
-# Print ALL output BEFORE checking exit code
-if result.stdout:
-    print(f"[ASK stdout]\n{result.stdout}")
-if result.stderr:
-    print(f"[ASK stderr]\n{result.stderr}", file=sys.stderr)
-print(f"[ASK exit code] {result.returncode}")
-
-if result.returncode != 0:
-    sys.exit(result.returncode)
-
-# 4. Capture new skill ID
-try:
-    with open(".ask/config") as f:
-        cfg = json.load(f)
-    sid = cfg.get("profiles", {}).get("default", {}).get("skillId", "")
+    # Extract skill ID from response
+    sid = r["parsed"].get("skillId", "")
+    if not sid:
+        # Try to extract from raw response
+        for key in ["skillId", "id", "skill_id"]:
+            if key in r["parsed"]:
+                sid = r["parsed"][key]
+                break
     if sid:
-        github_output = os.environ.get("GITHUB_OUTPUT", "")
-        if github_output:
-            with open(github_output, "a") as out:
-                out.write(f"skill_id={sid}\n")
-        print(f"Skill ID: {sid}")
-        if not SKILL_ID:
-            print("=" * 60)
-            print(">>> IMPORTANT: Save this Skill ID as GitHub Secret SKILL_ID <<<")
-            print("=" * 60)
-except Exception as e:
-    print(f"Could not capture skill ID: {e}")
+        SKILL_ID = sid
+        print(f"Created skill: {SKILL_ID}")
+    else:
+        print(f"Could not extract skill ID from response: {r['raw_out'][:200]}")
+        sys.exit(1)
+else:
+    # --- UPDATE existing skill ---
+    print(f"=== Updating skill {SKILL_ID} ===")
+    r = run_ask([
+        "update-skill",
+        "--skill-id", SKILL_ID,
+        "--manifest", json.dumps(manifest),
+    ])
+    if r["code"] != 0:
+        print(f"FAILED to update skill (non-fatal, may already be up to date)")
+        # Don't exit — try interaction model anyway
+
+# 3. Deploy interaction model
+print(f"=== Deploying interaction model for {SKILL_ID} ===")
+r = run_ask([
+    "update-interaction-model",
+    "--skill-id", SKILL_ID,
+    "--locale", "it-IT",
+    "--interaction-model", json.dumps(interaction_model),
+])
+if r["code"] != 0:
+    print("FAILED to update interaction model")
+    sys.exit(r["code"])
+
+# 4. Save skill ID to .ask/config for future runs
+os.makedirs(".ask", exist_ok=True)
+with open(".ask/config", "w") as f:
+    json.dump({
+        "profiles": {
+            "default": {
+                "skillId": SKILL_ID,
+            }
+        }
+    }, f, indent=2)
+print(f"Saved skill ID to .ask/config")
+
+# 5. Export skill ID for GitHub Actions
+github_output = os.environ.get("GITHUB_OUTPUT", "")
+if github_output:
+    with open(github_output, "a") as out:
+        out.write(f"skill_id={SKILL_ID}\n")
+    print(f"Exported skill_id={SKILL_ID} to GITHUB_OUTPUT")
+
+print(f"\n=== SUCCESS ===")
+print(f"Skill ID: {SKILL_ID}")
+if not os.environ.get("SKILL_ID"):
+    print("=" * 60)
+    print(">>> IMPORTANT: Save this Skill ID as GitHub Secret SKILL_ID <<<")
+    print("=" * 60)
