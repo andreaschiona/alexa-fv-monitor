@@ -85,15 +85,17 @@ jobs:
             "profiles": {
               "default": {
                 "vendor_id": "${ASK_VENDOR_ID}",
-                "oauth_client": {
-                  "client_id": "${ASK_CLIENT_ID}",
-                  "client_secret": "${ASK_CLIENT_SECRET}"
+                "token": {
+                  "access_token": "${ASK_ACCESS_TOKEN}",
+                  "refresh_token": "${ASK_REFRESH_TOKEN}",
+                  "token_type": "bearer",
+                  "expires_in": 3600
                 }
               }
             }
           }
           CONFIG
-          # Expand env vars in the config (GitHub Actions heredoc doesn't expand $ vars with 'CONFIG' quotes)
+          # Expand env vars in the config
           python3 -c "
           import json, os
           with open(os.path.expanduser('~/.ask/cli_config')) as f:
@@ -107,8 +109,8 @@ jobs:
           echo "ASK CLI configured for vendor: $ASK_VENDOR_ID"
         env:
           ASK_VENDOR_ID: ${{ secrets.ASK_VENDOR_ID }}
-          ASK_CLIENT_ID: ${{ secrets.ASK_CLIENT_ID }}
-          ASK_CLIENT_SECRET: ${{ secrets.ASK_CLIENT_SECRET }}
+          ASK_ACCESS_TOKEN: ${{ secrets.ASK_ACCESS_TOKEN }}
+          ASK_REFRESH_TOKEN: ${{ secrets.ASK_REFRESH_TOKEN }}
 
       - name: Deploy Alexa Skill Model
         id: ask_deploy
