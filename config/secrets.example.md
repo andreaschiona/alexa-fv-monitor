@@ -38,13 +38,13 @@ I token ASK CLI sono già configurati su Hermes in `~/.ask/cli_config`. Per estr
 grep vendor_id ~/.ask/cli_config | head -1 | cut -d'"' -f4
 
 # Access Token
-grep -A1 access_token ~/.ask/cli_config | head -2 | tail -1 | cut -d'"' -f4
+python3 -c "import json; print(json.load(open('/data/data/com.hermesagent.android/files/home/.ask/cli_config'))['profiles']['default']['token']['access_token'])"
 
 # Refresh Token
-grep -A1 refresh_token ~/.ask/cli_config | head -2 | tail -1 | cut -d'"' -f4
+python3 -c "import json; print(json.load(open('/data/data/com.hermesagent.android/files/home/.ask/cli_config'))['profiles']['default']['token']['refresh_token'])"
 ```
 
-> ⚠️ **Primo deploy**: il workflow creerà la skill automaticamente. Dopo il primo run, prendi il **Skill ID** dall'output del workflow e salvalo come `SKILL_ID` per gli aggiornamenti successivi.
+> ⚠️ **Primo deploy**: il workflow crea la skill automaticamente. Dopo il primo run, prendi il **Skill ID** dall'output del workflow e salvalo come `SKILL_ID` per gli aggiornamenti successivi.
 
 ## Come impostare i secrets
 
