@@ -8,7 +8,7 @@ SKILL_ID = os.environ.get("SKILL_ID", "")
 result = subprocess.run(["ask", "--version"], capture_output=True, text=True)
 print(f"ASK CLI version: {result.stdout.strip() or result.stderr.strip()}")
 
-# 1. Generate ask-resources.json (required by ASK CLI v2)
+# 1. Generate ask-resources.json (required by ASK CLI v2 — use "src" for v1 compat)
 ask_resources = {
     "askcliResourcesVersion": "2020-03-31",
     "profiles": {
@@ -16,7 +16,7 @@ ask_resources = {
             "skillMetadata": {
                 "type": "SKILL_PACKAGE",
                 "skillPackage": {
-                    "path": "skill-package"
+                    "src": "skill-package"
                 }
             }
         }
