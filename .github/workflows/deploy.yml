@@ -8,6 +8,7 @@ on:
       - 'config/template.yaml'
       - 'skill-package/**'
       - 'VERSION'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
